@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PolyCarbin Recycling Game</title>
+<style>
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 20px;
+    text-align: center;
+  }
+  h1 { margin-bottom: 5px; }
+  #stats { font-size: 18px; margin-bottom: 15px; color: #333; }
+
+  #item-area {
+    min-height: 220px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 25px;
+  }
+
+  .item-card {
+    width: 150px;
+    height: 170px;
+    background: white;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: transform 0.1s, border-color 0.1s;
+  }
+  .item-card.selected {
+    border-color: #2196F3;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 3px rgba(33,150,243,0.4);
+  }
+  .item-card img {
+    max-width: 100px;
+    max-height: 90px;
+    object-fit: contain;
+    margin-bottom: 8px;
+  }
+  .item-card .emoji {
+    font-size: 50px;
+    margin-bottom: 8px;
+  }
+  .item-card .name {
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  #bins {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .bin {
+    width: 180px;
+    min-height: 130px;
+    border-radius: 10px;
+    border: 3px dashed #888;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 10px;
+    font-weight: bold;
+    color: white;
+    font-size: 16px;
+    transition: transform 0.1s;
+  }
+  .bin:hover { transform: scale(1.03); }
+
+  #bin-clear      { background: #64b5f6; }
+  #bin-colored    { background: #9c27b0; }
+  #bin-trash      { background: #616161; }
+  #bin-biohazard  { background: #d32f2f; }
+
+  #feedback {
+    font-size: 20px;
+    font-weight: bold;
+    min-height: 30px;
+    margin-bottom: 15px;
+  }
+  .correct { color: #2e7d32; }
+  .incorrect { color: #c62828; }
+
+  #restart-btn, #hint-btn {
+    padding: 10px 20px;
+    font-size: 15px;
+    border: none;
+    border-radius: 6px;
+    background: #2196F3;
+    color: white;
+    cursor: pointer;
+    margin: 5px;
+  }
+  #restart-btn:hover, #hint-btn:hover { background: #1976D2; }
+
+  #end-screen { display: none; }
+</style>
+</head>
+<body>
+
+<h1>PolyCarbin Recycling Game</h1>
+<p>Click an item, then click the bin it belongs in.</p>
+
+<div id="stats">Item 1 of 1 &nbsp;|&nbsp; Score: 0</div>
+
+<div id="item-area"></div>
+
+<div id="feedback"></div>
+
+<div id="bins">
+  <div class="bin" id="bin-clear" data-bin="clear">PolyCarbin Clear Plastic</div>
+  <div class="bin" id="bin-colored" data-bin="colored">PolyCarbin Colored Plastic</div>
+  <div class="bin" id="bin-trash" data-bin="trash">Trash</div>
+  <div class="bin" id="bin-biohazard" data-bin="biohazard">☣ Biohazard</div>
+</div>
+
+<div id="end-screen">
+  <h2 id="final-score"></h2>
+  <button id="restart-btn">Play Again</button>
+</div>
+
+<script>
+/* ===========================================================
+   EDIT THIS LIST TO CUSTOMIZE ITEMS
+   - name: label shown under the item
+   - bin: must be "clear", "colored", "trash", or "biohazard"
+   - img: filename or URL to an image (optional)
+   - emoji: fallback shown if no image is provided, or if the
+            image fails to load (e.g. file not found)
+   =========================================================== */
+const ITEMS = [
+  // --- Trash ---
+  { name: "Weigh Boats", bin: "trash", img: "weigh boat.webp", emoji: "" },
+  { name: "Latex Gloves", bin: "trash", img: "gloves.webp", emoji: "" },
+  { name: "Silicone and TPE Tubing", bin: "trash", img: "tubing.webp", emoji: "〰️" },
+  { name: "plastic film", bin: "trash", img: "film.jpeg", emoji: "" },
+  { name: "Styrofoam", bin: "trash", img: "styrofoam.webp", emoji: "" },
+  { name: "ice packs", bin: "trash", img: "ice pack.jpeg", emoji: "" },
+
+  // --- Biohazard ---
+  { name: "Biological Waste", bin: "biohazard", img: "biohazard.jpeg", emoji: "" },
+
+  // ---PolyCarbin Clear Plastic ---
+  { name: "Eppendorf Tubes", bin: "clear", img: "eppendorf.webp", emoji: "" },
+  { name: "Well Plates (clean)", bin: "clear", img: "well plate.jpeg", emoji: "" },
+  { name: "Serological Pipettes", bin: "clear", img: "serological.jpeg", emoji: "" },
+  { name: "Filter Flasks", bin: "clear", img: "filter flask.webp", emoji: "" },
+  { name: "PCR Strips", bin: "clear", img: "pcr strip.webp", emoji: "" },
+  { name: "Clear Pipette Box lid/case", bin: "clear", img: "clear rainin.jpeg", emoji: "" },
+  { name: "Filtered Pipette Tips", bin: "clear", img: "filter tip.jpeg", emoji: "" },
+  { name: "Syringes", bin: "clear", img: "", emoji: "💉" },
+  { name: "Conical Tubes", bin: "clear", img: "conical tube.webp", emoji: "" },
+
+  // ---PolyCarbin Colored Plastic ---
+  { name: "Opaque/colored tip box", bin: "colored", img: "opaque rainin.webp", emoji: "" },
+  { name: "White Chemical Bottles (clean)", bin: "colored", img: "sigma bottle.jpeg", emoji: "🧴" },
+  { name: "Tube Racks", bin: "colored", img: "tube rack.webp", emoji: "" },
+  { name: "White and Black Well Plates", bin: "colored", img: "black well plate.webp", emoji: "" },
+  { name: "Liquid Automation Tips", bin: "colored", img: "hamilton tips.jpeg", emoji: "" },
+];
+
+/* Bin display names for feedback messages */
+const BIN_NAMES = {
+  clear: "Clear Plastic",
+  colored: "Colored Plastic",
+  trash: "Trash",
+  biohazard: "Biohazard"
+};
+
+let queue = [];
+let currentIndex = 0;
+let score = 0;
+let locked = false;
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startGame() {
+  queue = shuffle(ITEMS);
+  currentIndex = 0;
+  score = 0;
+  document.getElementById("end-screen").style.display = "none";
+  document.getElementById("bins").style.display = "flex";
+  document.getElementById("item-area").style.display = "flex";
+  renderItem();
+}
+
+function renderItem() {
+  document.getElementById("feedback").textContent = "";
+  locked = false;
+  const stats = document.getElementById("stats");
+  stats.textContent = `Item ${currentIndex + 1} of ${queue.length} | Score: ${score}`;
+
+  const item = queue[currentIndex];
+  const area = document.getElementById("item-area");
+  area.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "item-card selected";
+
+  if (item.img) {
+    const img = document.createElement("img");
+    img.src = item.img;
+    img.onerror = function() {
+      img.remove();
+      const emojiSpan = document.createElement("div");
+      emojiSpan.className = "emoji";
+      emojiSpan.textContent = item.emoji || "❓";
+      card.insertBefore(emojiSpan, card.firstChild);
+    };
+    card.appendChild(img);
+  } else {
+    const emojiSpan = document.createElement("div");
+    emojiSpan.className = "emoji";
+    emojiSpan.textContent = item.emoji || "❓";
+    card.appendChild(emojiSpan);
+  }
+
+  const nameDiv = document.createElement("div");
+  nameDiv.className = "name";
+  nameDiv.textContent = item.name;
+  card.appendChild(nameDiv);
+
+  area.appendChild(card);
+}
+
+function handleBinClick(binId) {
+  if (locked) return;
+  locked = true;
+  const item = queue[currentIndex];
+  const feedback = document.getElementById("feedback");
+
+  if (binId === item.bin) {
+    score++;
+    feedback.textContent = "✅ Correct!";
+    feedback.className = "correct";
+  } else {
+    feedback.textContent = `❌ Incorrect — that belongs in ${BIN_NAMES[item.bin]}.`;
+    feedback.className = "incorrect";
+  }
+
+  document.getElementById("stats").textContent =
+    `Item ${currentIndex + 1} of ${queue.length} | Score: ${score}`;
+
+  setTimeout(() => {
+    currentIndex++;
+    if (currentIndex >= queue.length) {
+      showEndScreen();
+    } else {
+      renderItem();
+    }
+  }, 1200);
+}
+
+function showEndScreen() {
+  document.getElementById("bins").style.display = "none";
+  document.getElementById("item-area").style.display = "none";
+  document.getElementById("feedback").textContent = "";
+  document.getElementById("end-screen").style.display = "block";
+  document.getElementById("final-score").textContent =
+    `Finished! Final score: ${score} / ${queue.length}`;
+}
+
+document.querySelectorAll(".bin").forEach(binEl => {
+  binEl.addEventListener("click", () => handleBinClick(binEl.dataset.bin));
+});
+document.getElementById("restart-btn").addEventListener("click", startGame);
+
+startGame();
+</script>
+
+</body>
+</html>
